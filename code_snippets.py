@@ -57,7 +57,7 @@ def load_balanced_sample(paths, rows_per_label=12000, random_state=42, save_cach
     for chunk in read_data_in_chunks(paths, columns=columns_to_read):
         chunk = chunk.dropna(subset=["text", "source"]).copy()
 
-        # Keep original source name, then create the simple Human/AI label.
+        # original source name, then create the simple Human/AI label.
         chunk["original_source"] = chunk["source"]
         chunk["label"] = chunk["source"].map(label_map)
         chunk = chunk.dropna(subset=["label"])
@@ -259,38 +259,14 @@ def compare_embedding_distances(embedding_sample, embedding_matrix, pair_count=3
     return pd.DataFrame(rows)
 
 
-def train_binary_text_classifiers(
-    sample,
-    text_column="text",
-    label_column="label",
-    test_size=0.2,
-    random_state=42,
-    max_features=30000,
-):
+def evaluate_classifiers(X_train, X_test, y_train, y_test, max_features=30000, random_state=42):
+    """Fit the standard model comparison suite on an already-built train/test split. """
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.linear_model import LogisticRegression, SGDClassifier
     from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-    from sklearn.model_selection import train_test_split
     from sklearn.naive_bayes import ComplementNB, MultinomialNB
     from sklearn.pipeline import Pipeline
     from sklearn.svm import LinearSVC
-
-    required_columns = {text_column, label_column}
-    missing_columns = required_columns.difference(sample.columns)
-
-    if missing_columns:
-        raise ValueError(f"Sample is missing required columns: {sorted(missing_columns)}")
-
-    data = sample[[text_column, label_column]].dropna().copy()
-    data[text_column] = data[text_column].astype(str)
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        data[text_column],
-        data[label_column],
-        test_size=test_size,
-        random_state=random_state,
-        stratify=data[label_column],
-    )
 
     tfidf_settings = {
         "max_features": max_features,
@@ -312,7 +288,7 @@ def train_binary_text_classifiers(
         ),
     }
 
-    label_order = ["Human", "AI"] if set(data[label_column].unique()) == {"Human", "AI"} else None
+    label_order = ["Human", "AI"] if set(y_train.unique()) | set(y_test.unique()) == {"Human", "AI"} else None
     results = []
     reports = {}
     confusion_matrices = {}
@@ -340,6 +316,8 @@ def train_binary_text_classifiers(
                 "macro_recall": report["macro avg"]["recall"],
                 "macro_f1": report["macro avg"]["f1-score"],
                 "weighted_f1": report["weighted avg"]["f1-score"],
+                "n_train": len(X_train),
+                "n_test": len(X_test),
             }
         )
 
@@ -356,6 +334,38 @@ def train_binary_text_classifiers(
     return results_table, reports, confusion_matrices, trained_models
 
 
+def train_binary_text_classifiers(
+    sample,
+    text_column="text",
+    label_column="label",
+    test_size=0.2,
+    random_state=42,
+    max_features=30000,
+):
+    from sklearn.model_selection import train_test_split
+
+    required_columns = {text_column, label_column}
+    missing_columns = required_columns.difference(sample.columns)
+
+    if missing_columns:
+        raise ValueError(f"Sample is missing required columns: {sorted(missing_columns)}")
+
+    data = sample[[text_column, label_column]].dropna().copy()
+    data[text_column] = data[text_column].astype(str)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        data[text_column],
+        data[label_column],
+        test_size=test_size,
+        random_state=random_state,
+        stratify=data[label_column],
+    )
+
+    return evaluate_classifiers(
+        X_train, X_test, y_train, y_test, max_features=max_features, random_state=random_state
+    )
+
+
 def print_binary_classification_results(results_table, reports, confusion_matrices):
     print("\nModel comparison:")
     print(results_table.round(4).to_string(index=False))
@@ -368,3 +378,4 @@ def print_binary_classification_results(results_table, reports, confusion_matric
 
     print("Confusion matrix for best model:")
     print(confusion_matrices[best_model].to_string())
+             
