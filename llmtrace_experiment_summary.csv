@@ -1,0 +1,3 @@
+stage,best_model,main_measure,score_percent,details
+Window classification,Multinomial Naive Bayes,Accuracy,59.63,Trained on pure Human/AI windows; tested on mixed-document windows.
+Boundary detection,MultinomialNB,Boundary F1,13.95,100-word windows; a match is within 500 characters of a true Human/AI transition.
