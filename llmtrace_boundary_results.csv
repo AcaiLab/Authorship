@@ -1,0 +1,2 @@
+experiment,model,window_words,tolerance_chars,documents_evaluated,window_accuracy_percent,boundary_precision_percent,boundary_recall_percent,boundary_f1_percent,mean_matched_distance_chars,predicted_boundaries,true_boundaries
+Mixed-document boundary detection,MultinomialNB,100,500,453,71.43,94.86,7.53,13.95,101.39,350,4409
